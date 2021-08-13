@@ -27,7 +27,7 @@ class editClass extends FormRequest
         return [
             'name' => 'required ',
             'player' => 'required',
-            'link' => 'required | url '
+            'link' => 'required  '
         ];
     }
 }

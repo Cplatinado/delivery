@@ -7,10 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use phpDocumentor\Reflection\Types\This;
+use \Illuminate\Database\Eloquent\SoftDeletes;
+
 
 class Video extends Model
 {
     use HasFactory;
+
+    protected $hidden = [
+        'updated_at',
+        'user_id',
+        '',
+
+
+    ];
     public function getCoverAttribute($value)
     {
         if(!empty($value)){
@@ -24,21 +34,28 @@ class Video extends Model
         return $this->hasOne(Progress::class);
     }
 
+
     public function answer()
     {
         return $this->hasMany(Comment::class);
     }
 
+    public function getConcluded($value)
+    {
+        return $this->with('concluded:id,video_id,concluded')->where('id', $value)
+            ->first(['link', 'id', 'player','status' ,'course_id',]);
+    }
+
     public function setLinkAttribute($value)
     {
         if($this->attributes['player'] == 1){
-            $this->attributes['link']  = substr($value, 0, 24) . 'embed/' . substr($value,32 );
+            $this->attributes['link']  =  $value;
 
         }else{
             $this->attributes['link']  = 'https://player.vimeo.com/video/' . substr($value,18);
         }
     }
 
-  
+
 
 }

@@ -28,7 +28,7 @@ class editCourse extends FormRequest
             'course' => (!empty($this->request->all()['id']) ? 'required|min:3|max:30 |unique:courses,name,' . $this->request->all()['id'] : 'required | min:3 | max:30| unique:courses,name,'),
             'category'=> 'required',
             'link' => (!empty($this->request->all()['id']) ? 'required | url |min:3| unique:courses,link,' . $this->request->all()['id'] : 'required |url| min:3 | unique:courses,link'),
-
+            // 'avatar' => 'dimensions:ratio=16/9'
         ];
     }
 }

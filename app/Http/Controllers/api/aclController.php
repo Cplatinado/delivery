@@ -50,19 +50,15 @@ class aclController extends Controller
     public function permissionSync(Request $request)
     {
         $permissionsRequest = $request->except(['_token','_method']);
-        // return response()->json($permissionsRequest);
 
         $permissions = [];
         foreach($permissionsRequest['list'] as $permission){
-
             if($permission != null){
                 $permissions[] = Permission::find( $permission['id']);
             }
-
         }
 
         $role = Role::find($permissionsRequest['role']);
-
         if(!empty($permissions)){
             $role->syncPermissions($permissions);
         }else{

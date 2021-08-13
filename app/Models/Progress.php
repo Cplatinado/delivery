@@ -4,10 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Progress extends Model
 {
     use HasFactory;
+    use SoftDeletes;
+
 
     public function getLastViewAttribute($value)
     {
@@ -18,5 +21,5 @@ class Progress extends Model
         return date('d/m/Y', strtotime($value));
     }
 
-   
+
 }

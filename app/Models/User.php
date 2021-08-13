@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\suport\Cropper;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Jetstream\HasProfilePhoto;
@@ -23,6 +24,8 @@ class User extends Authenticatable implements JWTSubject
     use HasProfilePhoto;
     use Notifiable;
     use TwoFactorAuthenticatable;
+    use SoftDeletes;
+
 
     /**
      * The attributes that are mass assignable.
@@ -79,7 +82,7 @@ class User extends Authenticatable implements JWTSubject
     public function getCoverAttribute($value)
     {
         if(!empty($value)){
-            return Storage::url((Cropper::thumb($value, 500, 500)));
+            return Storage::url((Cropper::thumb($value, 800, 800)));
         }else{
             return asset('images/profile.svg');
         }
@@ -94,6 +97,19 @@ class User extends Authenticatable implements JWTSubject
         $this->save();
 
     }
+    public function setBirthdayAttribute($value)
+    {
+        $this->attributes['birthday'] = (!empty($value) ? $this->convertStringToDate($value) : null);
+    }
+    public function getBirthdayAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        return date('d/m/Y', strtotime($value));
+    }
+
 
 
 
@@ -119,6 +135,15 @@ class User extends Authenticatable implements JWTSubject
     public function getJWTCustomClaims()
     {
         return [];
+    }
+    private function convertStringToDate(?string $param)
+    {
+        if (empty($param)) {
+            return null;
+        }
+
+        list($day, $month, $year) = explode('/', $param);
+        return (new \DateTime($year . '-' . $month . '-' . $day))->format('Y-m-d');
     }
 
 }

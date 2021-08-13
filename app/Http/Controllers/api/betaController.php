@@ -3,28 +3,42 @@
 namespace App\Http\Controllers\api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\confirmLoguin;
 use App\Models\Comment;
 use App\Models\Course;
+use App\Models\highlight;
 use App\Models\Module;
+use App\Models\Notions;
 use App\Models\Progress;
 use App\Models\User;
 use App\Models\Video;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Support\Facades\Mail;
 use function GuzzleHttp\Promise\all;
 
 class betaController extends Controller
 {
     public function getCourses()
     {
+
         $courses = Course::where('status', 1)->get(['cover', 'id']);
-        return response()->json($courses);
+        $header = highlight::where('type', 1)->where('active', 1)->first();
+        $highlights = highlight::where('type', 0)->with('course:id,cover')->get();
+
+
+        $data['courses'] = $courses;
+        $data['header'] = $header;
+        $data['highlights'] = $highlights;
+        return response()->json($data);
     }
 
-    public function getClassInfo(Request $request)
+    public function getcourseInfo(Course $course, Request $request)
     {
-        $course = Course::where('id', $request->course)->first(['name', 'id', 'user_id', 'headline', 'desc', 'cover']);
+
+//        $course = Course::where('id', $request->course)->first(['name', 'id', 'user_id', 'headline', 'desc', 'cover']);
+        $course = $course->getInfo($course->id);
         $producer = User::where('id', $course->user_id)->first(['username']);
 
         $data['course'] = $course;
@@ -34,15 +48,9 @@ class betaController extends Controller
     }
 
 
-    public function getCourse(Request $request)
+    public function getCourse(Course $course)
     {
-        $course = Course::with(['modules' => function ($query) {
-            $query->where('status', 1);
-            $query->with(['videos' => function ($query) {
-                $query->with('concluded');
-            }]);
-        }])->where('id', $request->course)->first();
-
+        $course = $course->betaContentCourse($course->id);
 
 
         $producer = User::where('id', $course->user_id)->first(['cover', 'username', 'bio']);
@@ -53,75 +61,71 @@ class betaController extends Controller
         return response()->json($data);
     }
 
-    public function getClass(Request $request)
+    public function getVideo(Video $video, Request $request)
     {
-        // return response()->json($request->all());
 
-        $class = Video::with('concluded')->find($request->class);
-        $class->views = $class->views +1;
+        $videoData = $video->getConcluded($video->id);
+        $video->views = $video->views + 1;
+        $video->save();
 
-        $class->save();
+        $course = Course::where('id', $video->course_id)->first(['link', 'slug']);
 
 
-        if (Progress::where('video_id', $class->id)->first()) {
-            $progress = Progress::where('video_id', $class->id)->first();
-            $progress->last_view =  date("m.d.y");;
+        if (Progress::where('video_id', $video->id)->first()) {
+            $progress = Progress::where('video_id', $video->id)->first();
+            $progress->last_view = date("Y-m-d");
             $progress->save();
         } else {
             $progress = new Progress();
             $progress->user_id = Auth::user()->id;
             $progress->video_id = $request->class;
-            $progress->course_id = $class->course_id;
-            $progress->last_view =  date("m.d.y");
+            $progress->course_id = $video->course_id;
+            $progress->last_view = date("Y-m-d");
             $progress->concluded = 0;
-            $progress->producer_id = $class->user_id;
+            $progress->producer_id = $video->user_id;
             $progress->save();
         }
 
-        $comments = Comment::with('user')->where('video_id', $class->id)->get();
+        $comments = Comment::with('user:id,username,cover')->where('video_id', $video->id)->get();
+
+        $notions = Notions::where('user_id', Auth::id())->where('video_id', $video->id)->get();
 
 
-        $modules = Module::where('status', 1)->where('course_id', $class->course_id)->with(['videos' => function ($query) {
+        $modules = Module::where('status', 1)->where('course_id', $video->course_id)->with(['videos' => function ($query) {
             $query->where('status', 1);
-            $query->with('concluded');
-        }])->get();
+            $query->with('concluded:id,video_id,concluded');
+
+
+        }])->get(['name', 'id']);
 
         $list = [];
 
         foreach ($modules as $module) {
-            foreach($module->videos as $video){
-                if(!empty($module)){
+            foreach ($module->videos as $video) {
+                if (!empty($module)) {
                     $list[] = $video;
-                   }
+//
+                }
+
             }
-
-
         }
         $data['modules'] = $modules;
-        $data['class'] = $class;
+        $data['class'] = $videoData;
         $data['classes'] = $list;
         $data['comments'] = $comments;
-
+        $data['course'] = $course;
+        $data['notions'] = $notions;
         return response()->json($data);
     }
 
-    public function concludedClass(Request $request)
+
+    public function concludedVideo(Request $request)
     {
-        $course = Course::where('id', $request->course)->first(['user_id']);
 
         if (Progress::where('video_id', $request->class)->where('user_id', Auth::user()->id)->first()) {
             $progress = Progress::where('video_id', $request->class)->first();
             $progress->concluded = !$progress->concluded;
             $progress->save();
-        } else {
-            // $progress = new Progress();
-            // $progress->user_id = Auth::check();
-            // $progress->video_id = $request->class;
-            // $progress->course_id = $request->course;
-            // $progress->concluded = 1;
-            // $progress->producer_id = $course->user_id;
-
-            // $progress->save();
         }
 
         return response()->json($progress->concluded);
@@ -132,7 +136,7 @@ class betaController extends Controller
     {
         $course = Course::where('id', $request->course)->first(['user_id']);
         $comment = new Comment();
-        $comment->user_id =  Auth::user()->id;
+        $comment->user_id = Auth::user()->id;
         $comment->course_id = $request->course;
         $comment->video_id = $request->video;
         $comment->comment = $request->comment;
